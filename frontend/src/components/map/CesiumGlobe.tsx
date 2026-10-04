@@ -12,6 +12,7 @@ import {
   Crosshair,
   MapPin,
   AlertTriangle,
+  Tag,
 } from 'lucide-react';
 import { CesiumRainfallLayerId, GeoJSONFeatureCollection } from '@/lib/types';
 import { formatCoordinates, formatNumber } from '@/lib/formatters';
@@ -35,6 +36,42 @@ interface CesiumGlobeProps {
   } | null;
 }
 
+interface KeyPlace {
+  name: string;
+  state: string;
+  lat: number;
+  lon: number;
+  type: 'CAPITAL' | 'METRO' | 'OROGRAPHIC' | 'HIMALAYAN' | 'COASTAL' | 'HUB' | 'CITY' | 'ISLAND';
+}
+
+const KEY_INDIA_PLACES: KeyPlace[] = [
+  { name: 'New Delhi', state: 'Delhi (NCR)', lat: 28.6139, lon: 77.2090, type: 'CAPITAL' },
+  { name: 'Mumbai', state: 'Maharashtra', lat: 19.0760, lon: 72.8777, type: 'METRO' },
+  { name: 'Kolkata', state: 'West Bengal', lat: 22.5726, lon: 88.3639, type: 'METRO' },
+  { name: 'Chennai', state: 'Tamil Nadu', lat: 13.0827, lon: 80.2707, type: 'METRO' },
+  { name: 'Bengaluru', state: 'Karnataka', lat: 12.9716, lon: 77.5946, type: 'METRO' },
+  { name: 'Hyderabad', state: 'Telangana', lat: 17.3850, lon: 78.4867, type: 'METRO' },
+  { name: 'Ahmedabad', state: 'Gujarat', lat: 23.0225, lon: 72.5714, type: 'CITY' },
+  { name: 'Nagpur', state: 'Maharashtra', lat: 21.1458, lon: 79.0882, type: 'HUB' },
+  { name: 'Pune', state: 'Maharashtra', lat: 18.5204, lon: 73.8567, type: 'CITY' },
+  { name: 'Mahabaleshwar', state: 'Maharashtra', lat: 17.9237, lon: 73.6586, type: 'OROGRAPHIC' },
+  { name: 'Cherrapunji', state: 'Meghalaya', lat: 25.2702, lon: 91.7323, type: 'OROGRAPHIC' },
+  { name: 'Guwahati', state: 'Assam', lat: 26.1445, lon: 91.7362, type: 'HUB' },
+  { name: 'Srinagar', state: 'Jammu & Kashmir', lat: 34.0837, lon: 74.7973, type: 'HIMALAYAN' },
+  { name: 'Shimla', state: 'Himachal Pradesh', lat: 31.1048, lon: 77.1734, type: 'HIMALAYAN' },
+  { name: 'Jaipur', state: 'Rajasthan', lat: 26.9124, lon: 75.7873, type: 'CITY' },
+  { name: 'Lucknow', state: 'Uttar Pradesh', lat: 26.8467, lon: 80.9462, type: 'CITY' },
+  { name: 'Patna', state: 'Bihar', lat: 25.5941, lon: 85.1376, type: 'CITY' },
+  { name: 'Bhubaneswar', state: 'Odisha', lat: 20.2961, lon: 85.8245, type: 'COASTAL' },
+  { name: 'Visakhapatnam', state: 'Andhra Pradesh', lat: 17.6868, lon: 83.2185, type: 'COASTAL' },
+  { name: 'Kochi', state: 'Kerala', lat: 9.9312, lon: 76.2673, type: 'COASTAL' },
+  { name: 'Thiruvananthapuram', state: 'Kerala', lat: 8.5241, lon: 76.9366, type: 'COASTAL' },
+  { name: 'Bhopal', state: 'Madhya Pradesh', lat: 23.2599, lon: 77.4126, type: 'CITY' },
+  { name: 'Panaji (Goa)', state: 'Goa', lat: 15.4909, lon: 73.8278, type: 'COASTAL' },
+  { name: 'Leh', state: 'Ladakh', lat: 34.1526, lon: 77.5771, type: 'HIMALAYAN' },
+  { name: 'Port Blair', state: 'Andaman & Nicobar', lat: 11.6234, lon: 92.7265, type: 'ISLAND' },
+];
+
 export const CesiumGlobe: React.FC<CesiumGlobeProps> = ({
   latitude,
   longitude,
@@ -51,11 +88,15 @@ export const CesiumGlobe: React.FC<CesiumGlobeProps> = ({
   const viewerRef = useRef<CesiumType.Viewer | null>(null);
   const geojsonDataSourceRef = useRef<CesiumType.GeoJsonDataSource | null>(null);
   const locationPinEntityRef = useRef<CesiumType.Entity | null>(null);
+  const labelsLayerRef = useRef<CesiumType.ImageryLayer | null>(null);
+  const placeEntitiesRef = useRef<CesiumType.Entity[]>([]);
   const isCesiumLoadedRef = useRef(false);
 
   const [isInitializing, setIsInitializing] = useState(true);
   const [terrainLoaded, setTerrainLoaded] = useState(false);
   const [satelliteLoaded, setSatelliteLoaded] = useState(false);
+  const [placeNamesLoaded, setPlaceNamesLoaded] = useState(false);
+  const [showPlaceNames, setShowPlaceNames] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [selectedPolygonMeta, setSelectedPolygonMeta] = useState<Record<string, unknown> | null>(null);
@@ -155,7 +196,7 @@ export const CesiumGlobe: React.FC<CesiumGlobeProps> = ({
                 style: Cesium.IonWorldImageryStyle.AERIAL_WITH_LABELS,
               });
             } catch (ionErr) {
-              console.warn('[HydroWatch Cesium] Ion World Imagery initialization fallback:', ionErr);
+              console.warn('[MeghaNetra Cesium] Ion World Imagery initialization fallback:', ionErr);
             }
           }
 
@@ -177,8 +218,37 @@ export const CesiumGlobe: React.FC<CesiumGlobeProps> = ({
             viewer.imageryLayers.addImageryProvider(baseProvider);
             setSatelliteLoaded(true);
           }
+
+          // 1b. Add Place Names, Country Borders & City Labels Overlay (World Boundaries and Places)
+          try {
+            let labelsProvider: CesiumType.ImageryProvider | null = null;
+            if (typeof Cesium.ArcGisMapServerImageryProvider?.fromUrl === 'function') {
+              try {
+                labelsProvider = await Cesium.ArcGisMapServerImageryProvider.fromUrl(
+                  'https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer',
+                  { enablePickFeatures: false }
+                );
+              } catch (pErr) {
+                console.warn('[MeghaNetra Cesium] ArcGis labels provider fromUrl fallback:', pErr);
+              }
+            }
+            if (!labelsProvider) {
+              labelsProvider = new Cesium.UrlTemplateImageryProvider({
+                url: 'https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+                maximumLevel: 18,
+              });
+            }
+            if (labelsProvider && !isCancelled && viewerRef.current) {
+              const labelsLayer = viewer.imageryLayers.addImageryProvider(labelsProvider);
+              labelsLayer.alpha = 1.0;
+              labelsLayerRef.current = labelsLayer;
+              setPlaceNamesLoaded(true);
+            }
+          } catch (labelsErr) {
+            console.warn('[MeghaNetra Cesium] Place names overlay layer error:', labelsErr);
+          }
         } catch (imageryErr) {
-          console.warn('[HydroWatch Cesium] Base satellite imagery error:', imageryErr);
+          console.warn('[MeghaNetra Cesium] Base satellite imagery error:', imageryErr);
         }
 
         // 2. Configure 3D World Terrain with realistic relief & water mask
@@ -209,8 +279,65 @@ export const CesiumGlobe: React.FC<CesiumGlobeProps> = ({
             }
           }
         } catch (terrainErr) {
-          console.warn('[HydroWatch Cesium] 3D World Terrain fallback to ellipsoid:', terrainErr);
+          console.warn('[MeghaNetra Cesium] 3D World Terrain fallback to ellipsoid:', terrainErr);
           setTerrainLoaded(false);
+        }
+
+        // 3. Create Key Cities & Meteorological Stations 3D Entities on the Globe
+        try {
+          const placeEntities: CesiumType.Entity[] = [];
+          for (const place of KEY_INDIA_PLACES) {
+            const isCap = place.type === 'CAPITAL';
+            const isOro = place.type === 'OROGRAPHIC';
+            const dotColor = isCap
+              ? Cesium.Color.fromCssColorString('#f59e0b')
+              : isOro
+              ? Cesium.Color.fromCssColorString('#10b981')
+              : Cesium.Color.fromCssColorString('#00e5ff');
+
+            const pEntity = viewer.entities.add({
+              name: place.name,
+              position: Cesium.Cartesian3.fromDegrees(place.lon, place.lat),
+              properties: {
+                isPlaceName: true,
+                placeName: place.name,
+                state: place.state,
+                latitude: place.lat,
+                longitude: place.lon,
+                placeType: place.type,
+              },
+              point: {
+                pixelSize: isCap ? 8 : 6,
+                color: dotColor,
+                outlineColor: Cesium.Color.fromCssColorString('#07090e'),
+                outlineWidth: 2,
+                heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+                disableDepthTestDistance: Number.POSITIVE_INFINITY,
+                distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 9000000),
+              },
+              label: {
+                text: place.name,
+                font: isCap
+                  ? 'bold 11px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                  : '600 10px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                fillColor: isCap
+                  ? Cesium.Color.fromCssColorString('#fde047')
+                  : Cesium.Color.WHITE,
+                outlineColor: Cesium.Color.fromCssColorString('#08090c'),
+                outlineWidth: 3,
+                style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+                verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+                pixelOffset: new Cesium.Cartesian2(0, -9),
+                heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+                disableDepthTestDistance: Number.POSITIVE_INFINITY,
+                distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 7500000),
+              },
+            });
+            placeEntities.push(pEntity);
+          }
+          placeEntitiesRef.current = placeEntities;
+        } catch (placeErr) {
+          console.warn('[MeghaNetra Cesium] Place entities initialization warning:', placeErr);
         }
 
         // 3. Configure Click / Hover Handler for Inundation Polygons
@@ -236,7 +363,7 @@ export const CesiumGlobe: React.FC<CesiumGlobeProps> = ({
         flyCameraToCoordinates(viewer, latitude, longitude, 18000, -38);
         updateLocationPin(viewer, latitude, longitude, locationName);
       } catch (err) {
-        console.error('[HydroWatch Cesium] Viewer initialization failure:', err);
+        console.error('[MeghaNetra Cesium] Viewer initialization failure:', err);
         setErrorMessage('Geospatial view initialization failed. WebGL2 or 3D canvas unavailable.');
         setIsInitializing(false);
       }
@@ -250,6 +377,8 @@ export const CesiumGlobe: React.FC<CesiumGlobeProps> = ({
         viewerRef.current.destroy();
         viewerRef.current = null;
       }
+      labelsLayerRef.current = null;
+      placeEntitiesRef.current = [];
     };
   }, []);
 
@@ -381,7 +510,7 @@ export const CesiumGlobe: React.FC<CesiumGlobeProps> = ({
           offset: new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(-38), 0),
         });
       } catch (geoErr) {
-        console.warn('[HydroWatch Cesium] GeoJSON polygon rendering error:', geoErr);
+        console.warn('[MeghaNetra Cesium] GeoJSON polygon rendering error:', geoErr);
       }
     }
 
@@ -452,14 +581,32 @@ export const CesiumGlobe: React.FC<CesiumGlobeProps> = ({
         const v = viewerRef.current;
 
         const pickedObject = v.scene.pick(click.position);
-        if (Cesium.defined(pickedObject) && pickedObject.id && pickedObject.id.properties) {
-          const props: Record<string, unknown> = {};
-          const propertyNames = pickedObject.id.properties.propertyNames;
-          for (const name of propertyNames) {
-            props[name] = pickedObject.id.properties[name]?.getValue();
+        if (Cesium.defined(pickedObject) && pickedObject.id) {
+          const entity = pickedObject.id;
+          if (entity.properties && entity.properties.isPlaceName) {
+            const pName = entity.properties.placeName?.getValue();
+            const pState = entity.properties.state?.getValue();
+            const pLat = entity.properties.latitude?.getValue();
+            const pLon = entity.properties.longitude?.getValue();
+            if (pLat !== undefined && pLon !== undefined) {
+              setInspectedLocation({
+                lat: pLat,
+                lon: pLon,
+                name: `${pName} (${pState})`,
+              });
+              flyCameraToCoordinates(v, pLat, pLon, 25000, -38);
+              return;
+            }
           }
-          setSelectedPolygonMeta(props);
-          return;
+          if (entity.properties) {
+            const props: Record<string, unknown> = {};
+            const propertyNames = entity.properties.propertyNames;
+            for (const name of propertyNames) {
+              props[name] = entity.properties[name]?.getValue();
+            }
+            setSelectedPolygonMeta(props);
+            return;
+          }
         }
 
         const cartesian = v.camera.pickEllipsoid(click.position, v.scene.globe.ellipsoid);
@@ -586,6 +733,27 @@ export const CesiumGlobe: React.FC<CesiumGlobeProps> = ({
           className="p-1.5 rounded hover:bg-[#1b2234] text-[#94a3b8] hover:text-white transition-colors"
         >
           <Compass className="w-4 h-4" />
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            const nextVal = !showPlaceNames;
+            setShowPlaceNames(nextVal);
+            if (labelsLayerRef.current) {
+              labelsLayerRef.current.show = nextVal;
+            }
+            for (const ent of placeEntitiesRef.current) {
+              ent.show = nextVal;
+            }
+          }}
+          title={showPlaceNames ? 'Hide Place Names & Labels' : 'Show Place Names & Labels'}
+          className={`p-1.5 rounded transition-colors ${
+            showPlaceNames
+              ? 'bg-[#00e5ff]/20 text-[#00e5ff] hover:bg-[#00e5ff]/30'
+              : 'text-[#94a3b8] hover:bg-[#1b2234] hover:text-white'
+          }`}
+        >
+          <Tag className="w-4 h-4" />
         </button>
         <div className="border-t border-[#1e2638] my-0.5" />
         <button
@@ -743,7 +911,11 @@ export const CesiumGlobe: React.FC<CesiumGlobeProps> = ({
           </span>
           <span className="flex items-center gap-1">
             <span className={`w-1.5 h-1.5 rounded-full ${satelliteLoaded ? 'bg-[#10b981]' : 'bg-[#94a3b8]'}`} />
-            Esri World Imagery
+            Esri Imagery
+          </span>
+          <span className="flex items-center gap-1">
+            <span className={`w-1.5 h-1.5 rounded-full ${showPlaceNames && placeNamesLoaded ? 'bg-[#00e5ff]' : 'bg-[#94a3b8]'}`} />
+            Place Names
           </span>
         </div>
       </div>

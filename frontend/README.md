@@ -1,6 +1,6 @@
-# HydroWatch Frontend — Complete Geospatial Intelligence Interface
+# MeghaNetra Frontend — Complete Geospatial Intelligence Interface
 
-HydroWatch is a commercial-grade, multi-source flood risk assessment and early warning platform synthesizing observational weather, NOAA GFS NWP, RainViewer Doppler radar, and Sentinel-2 multispectral flood inundation analytics.
+MeghaNetra is a commercial-grade, multi-source flood risk assessment and early warning platform synthesizing observational weather, NOAA GFS NWP, RainViewer Doppler radar, and Sentinel-2 multispectral flood inundation analytics.
 
 ---
 

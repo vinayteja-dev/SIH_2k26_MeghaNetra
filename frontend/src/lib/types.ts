@@ -1,5 +1,5 @@
 /**
- * HydroWatch Frontend Type Definitions
+ * MeghaNetra Frontend Type Definitions
  * Directly mirrors backend Pydantic models from FastAPI OpenAPI specification.
  */
 

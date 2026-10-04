@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'HydroWatch — Geospatial Environmental & Flood Intelligence',
+  title: 'MeghaNetra — Geospatial Environmental & Flood Intelligence',
   description:
     'Commercial-grade multi-source flood risk assessment and early warning platform synthesizing observational weather, NOAA GFS NWP, RainViewer Doppler radar, and Sentinel-2 FloodUNet inundation analytics.',
 };

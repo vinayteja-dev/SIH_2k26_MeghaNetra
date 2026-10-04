@@ -1,4 +1,4 @@
-# HydroWatch AI: Regime-Aware AI Post-Processing of Monsoon Rainfall Forecasts
+# MeghaNetra: Regime-Aware AI Post-Processing of Monsoon Rainfall Forecasts
 
 [![SIH 2026](https://img.shields.io/badge/SIH-2026%20Problem%20Statement%2026080-blue.svg)](https://sih.gov.in)
 [![Ministry](https://img.shields.io/badge/Ministry-Ministry%20of%20Earth%20Sciences%20(MoES)-0284c7.svg)](https://moes.gov.in)
@@ -8,7 +8,7 @@
 [![Cesium](https://img.shields.io/badge/Geospatial-Cesium%20Ion%203D-1f6feb.svg?logo=cesium&logoColor=white)](https://cesium.com)
 [![Tests Passing](https://img.shields.io/badge/Tests-193%20Passing-success.svg)](https://github.com)
 
-**HydroWatch AI** is a meteorological intelligence and regime-aware AI post-processing platform designed for the **Ministry of Earth Sciences (MoES)** and the **National Centre for Medium Range Weather Forecasting (NCMRWF)** under **Smart India Hackathon 2026 (Problem Statement SIH26080)**.
+**MeghaNetra** is a meteorological intelligence and regime-aware AI post-processing platform designed for the **Ministry of Earth Sciences (MoES)** and the **National Centre for Medium Range Weather Forecasting (NCMRWF)** under **Smart India Hackathon 2026 (Problem Statement SIH26080)**.
 
 The platform addresses the challenge of Numerical Weather Prediction (NWP) systematic biases during the South Asian Summer Monsoon (SASM) by diagnosing synoptic weather regimes and applying regime-conditioned residual AI post-processing across four benchmark models:
 1. **Raw NWP Baseline** (Direct uncalibrated numerical output)
